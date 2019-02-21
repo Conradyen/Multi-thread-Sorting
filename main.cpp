@@ -11,9 +11,11 @@ using namespace std;
 
 sem_t semaphore;
 int* array_ptr;
+int array_len;
 pair<int,int>* idx_array;
 int test_arr[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};
-int counter = 0;
+unsigned thread_block_counter = 1;
+pthread_barrier_t barr;
 
 void error(const char *msg){
   perror(msg);
@@ -44,7 +46,7 @@ void make_idxArray(int len){
   int mid = (len-1)/2;
   idx_array[1] = make_pair(0,mid);
   idx_array[2] = make_pair(mid+1,len-1);
-  for(int k = 3;k<num_thread(len);k+=2){
+  for(int k = 3;k<num_thread(len)-1;k+=2){
     int mid = (idx_array[k/2].first+idx_array[k/2].second)/2;
     idx_array[k] = make_pair(idx_array[k/2].first,mid);
     idx_array[k+1] = make_pair(mid+1,idx_array[k/2].second);
@@ -72,13 +74,34 @@ int read_input(string filename){
   return M;
 }
 
+bool is_sort(int arr[],int len){
+  int n = len;
+  if(n ==1 || n == 0){
+    return true;
+  }
+  if(arr[n-1] < arr[n-2]){
+    return false;
+  }
+  return is_sort(arr,n-1);
+}
+
+void printArray(){
+  for(int i = 0;i< array_len;i++){
+    cout<<array_ptr[i]<<" ";
+  }
+  cout<<"\n";
+}
+
+
 struct bsortarg{
-  int start;
-  int end;
+  //int start;
+  //int end;
+  int idx;
 };
 
 void bsort(int start,int end){
   //sem_wait( &semaphore );
+  cout<<start<<","<<end<<endl;
   while(start < end){
     if(array_ptr[start] > array_ptr[end]){
       int tmp = array_ptr[start];
@@ -92,24 +115,14 @@ void bsort(int start,int end){
 }
 
 void* bsort_thread(void* args){
-  struct bsortarg* param = (struct bsortarg*) args;
-  sem_wait( &semaphore );
-  cout<<"start"<<param->start<<endl;
-  cout<<"end"<<param->end<<endl;
-  bsort(param->start,param->end);
-  counter++;
-  sem_post( &semaphore );
-  return 0;
-}
 
-void* test(void* args){
   struct bsortarg* param = (struct bsortarg*) args;
   //cout<<"start"<<param->start<<endl;
   //cout<<"end"<<param->end<<endl;
-  sem_wait( &semaphore );
-  test_arr[param->start]++;
-  test_arr[param->end]++;
-  sem_post( &semaphore );
+  bsort(idx_array[param->idx].first,idx_array[param->idx].second);
+  sem_post(&semaphore);
+  pthread_barrier_wait(&barr);
+  //pthread_barrier_wait(&barr);
   return 0;
 }
 
@@ -123,71 +136,61 @@ int main(int argc,char* argv[]){
     error("unknown flag");
   }
 
-  int len = read_input(string(argv[1]));
-  cout<<len<<endl;
-  pthread_t tid[num_thread(len)];
+  array_len = read_input(string(argv[1]));
+  cout<<array_len<<endl;
+  pthread_t tid[array_len-1];
   make_idxArray(16);
-  sem_init( &semaphore, 0, 0 );
-
+  for(int g = 0;g<15;g++){
+    cout<<idx_array[g].first<<","<<idx_array[g].second<<" ";
+  }
+  cout<<"\n";
+  bsortarg idx;
   cout<<"before"<<endl;
-  for(int i = 0;i < len;i++){
+  for(int i = 0;i < array_len;i++){
     cout<<array_ptr[i]<<" ";
   }
   cout<<"\n";
+  sem_init( &semaphore, 0, 1);
+  //pthread_barrier_init(&barr,NULL,1);
   for(int i = 0;i<4;i++){
+    //pthread_barrier_destroy(&barr);
     int num_t = _pow(2,i);
     int k = 0;
+    pthread_barrier_init(&barr,NULL,num_t);
 
     while(k < num_t){
-    bsortarg idx;
+    sem_wait(&semaphore);
+    int index = num_t+k-1;
     cout<<"idx :"<<num_t+k-1<<endl;
     //cout<<idx_array[num_t+k-1].first<<","<<idx_array[num_t+k-1].second<<endl;
-    //
-    sem_post(&semaphore);
-    int index = num_t+k-1;
-    idx.start = idx_array[index].first;
-    idx.end = idx_array[index].second;
-    sem_wait( &semaphore );
+
+    //idx.start = idx_array[index].first;
+    //idx.end = idx_array[index].second;
+    idx.idx = index;
     pthread_create(&tid[index], NULL, bsort_thread, (void *)&idx);
     k++;
+    }
 
-    //usleep(1000);
-
-   }
-   int s = num_t;
-   int count = 0;
-   //sem_wait( &semaphore );
-   while(count < num_t){
-     cout<<"join"<<"("<<idx_array[s+count-1].first<<","<<idx_array[s+count-1].second<<")"<<endl;
-     cout<<s + count-1<<endl;
-     pthread_join(tid[s + count-1],NULL);
-     if(o_mode){
-       cout<<"phase :"<<i+1<<endl;
-        for(int a = 0;a < len;a++){
-          cout<<array_ptr[a]<<" ";
-        }
-        cout<<"\n";
+    //sem_wait(&semaphore);
+    int s = num_t;
+    int count = 0;
+    while(count < num_t){
+      cout<<"join"<<"("<<idx_array[s+count-1].first<<","<<idx_array[s+count-1].second<<")"<<endl;
+      //cout<<s + count-1<<endl;
+      pthread_join(tid[s+count-1],NULL);
+      count++;
+    }
+    //sem_post( &semaphore );
+    pthread_barrier_destroy(&barr);
+    if(o_mode){
+      cout<<"phase :"<<i+1<<endl;
+       for(int a = 0;a < array_len;a++){
+         cout<<array_ptr[a]<<" ";
        }
-     count++;
-     //sem_post( &semaphore );
+       cout<<"\n";
+      }
    }
-   //sem_post( &semaphore );
-   /*
-  if(o_mode){
-    cout<<"phase :"<<i+1<<endl;
-     for(int a = 0;a < len;a++){
-       cout<<array_ptr[a]<<" ";
-     }
-     cout<<"\n";
-   }*/
-  }
-  cout<<"counter"<<counter<<endl;
-  /*
-  cout<<"after"<<endl;
-  for(int i = 0;i < len;i++){
-    cout<<array_ptr[i]<<" ";
-  }
-  cout<<"\n";*/
+
   delete array_ptr;
   delete idx_array;
 }
