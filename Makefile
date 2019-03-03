@@ -1,4 +1,4 @@
-all: main.cpp
-	g++ -lpthread -o proj2 balancedSort.cpp -std=c++11
+all: balancedSort.cpp
+	g++ -lpthread -o sort balancedSort.cpp -std=c++11
 clean:
-	rm proj2
+	rm sort
