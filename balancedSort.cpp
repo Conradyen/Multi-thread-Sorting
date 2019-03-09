@@ -109,14 +109,15 @@ void Ibarrier_init(Ibarrier_type *barr, int num){
   int M;
   file >> M; // first line
   int tmp_sem[M];
+  int count = M;
   float line;
   int i = 0;
-
-  while(file >> line){
+  while(count > 0 && file >> line){
     if(line < 1){
       line = solver(line);
     }
     tmp_sem[i++] = (int)line;
+    count--;
   }
   file.close();
   sem_init(&barr->mutex, 0, tmp_sem[0]);
@@ -155,11 +156,16 @@ void Ibarrier_out(Ibarrier_type *barr){
   sem_wait(&barr->out);
 }
 
-void Ibarrier_wait(Ibarrier_type *barr){
+void Ibarrier_wait(Ibarrier_type *barr,bool out,int threadnum){
   /*
   function call in thread
    */
   Ibarrier_in(barr);
+  if(out && threadnum == 0){
+    pthread_mutex_lock(&stdoutLock);
+    printArray();
+    pthread_mutex_unlock(&stdoutLock);
+  }
   Ibarrier_out(barr);
 }
 
@@ -216,14 +222,7 @@ void* bsort_thread(void* args){
         }
 
         printstatus(out,threadnum,stage,phase);
-        Ibarrier_wait(&barr);
-
-        if(out && threadnum == 0){
-          pthread_mutex_lock(&stdoutLock);
-          printArray();
-          pthread_mutex_unlock(&stdoutLock);
-        }
-
+        Ibarrier_wait(&barr,out,threadnum);
     }
   }
 }
