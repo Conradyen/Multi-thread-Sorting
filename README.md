@@ -18,11 +18,7 @@ To compile:
 ```
 make gen
 ```
-To make test file:
-```
-./test_case
-2 to the power of : 5
-```
+
 Input can be any integer. It will generate a file contain a list of integer with length 2 to the power of input.
 
 ## Reference
