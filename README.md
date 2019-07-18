@@ -14,10 +14,6 @@ All threads are start sequentially in a loop, arguments of thread function is st
 ## Input file
 Every line contain only one number. The first number is the length of the list to be sort.
 
-#### gen_test_file.cpp 
-
-Generates test file. File name will be "test.c".
-
 To compile:
 ```
 make gen
